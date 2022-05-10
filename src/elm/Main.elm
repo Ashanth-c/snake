@@ -35,11 +35,29 @@ type Msg
 {-| Manage all your updates here, from the main update function to each
  -|   subfunction. You can use the helpers in Update.elm to help construct
  -|   Cmds. -}
-updateSquare : Model -> Model
-updateSquare ({ coloredSquare } as model) =
-  coloredSquare + 1
-  |> modBy (40*40)
-  |> Setters.setColoredSquareIn model
+updateSquare : Model -> String -> Model
+updateSquare ({ coloredSquare } as model) choice =
+  case choice of
+    "right" -> 
+      coloredSquare + 1
+      |> modBy (40*40)
+      |> Setters.setColoredSquareIn model
+    "left" ->
+      coloredSquare - 1
+      |> modBy (40*40)
+      |> Setters.setColoredSquareIn model
+    "down" -> 
+      coloredSquare + 40
+      |> modBy (40*40)
+      |> Setters.setColoredSquareIn model
+    "up" ->
+      coloredSquare - 40
+      |> modBy (40*40)
+      |> Setters.setColoredSquareIn model
+    _ ->
+      coloredSquare +1
+      |> modBy (40*40)
+      |> Setters.setColoredSquareIn model
 
 toggleGameLoop : Model -> ( Model, Cmd Msg )
 toggleGameLoop ({ gameStarted } as model) =
@@ -51,15 +69,25 @@ keyDown : Key -> Model -> ( Model, Cmd Msg )
 keyDown key model =
   case Debug.log "key" key of
     Space -> 
-      updateSquare model 
+      update ToggleGameLoop model
+    ArrowLeft -> 
+      updateSquare model "left"
       |> Update.none
-    _ -> Update.none model
+    ArrowRight -> 
+      updateSquare model "right"
+      |> Update.none
+    ArrowUp -> 
+      updateSquare model "up"
+      |> Update.none
+    ArrowDown -> 
+      updateSquare model "down"
+      |> Update.none
 
 nextFrame : Posix -> Model -> ( Model, Cmd Msg )
 nextFrame time model =
   let time_ = Time.posixToMillis time in
   if time_ - model.lastUpdate >= 1000 then
-    updateSquare model
+    updateSquare model ""
     |> Setters.setTime time_
     |> Setters.setLastUpdate time_
     |> Update.none
@@ -86,7 +114,7 @@ generateCells : Model -> Int -> List (Html msg)
 generateCells coloredSquare n =
   case n of
     0 -> []
-    _ -> cell (n-1) coloredSquare.coloredSquare  :: generateCells coloredSquare (n-1)
+    _ -> generateCells coloredSquare (n-1) ++ [cell (n-1) coloredSquare.coloredSquare]
 
 movingSquare : Model -> Html msg
 movingSquare coloredSquare =
