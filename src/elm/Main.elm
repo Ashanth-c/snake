@@ -38,7 +38,7 @@ type Msg
 updateSquare : Model -> Model
 updateSquare ({ coloredSquare } as model) =
   coloredSquare + 1
-  |> modBy 4
+  |> modBy (40*40)
   |> Setters.setColoredSquareIn model
 
 toggleGameLoop : Model -> ( Model, Cmd Msg )
@@ -50,7 +50,9 @@ toggleGameLoop ({ gameStarted } as model) =
 keyDown : Key -> Model -> ( Model, Cmd Msg )
 keyDown key model =
   case Debug.log "key" key of
-    Space -> update ToggleGameLoop model
+    Space -> 
+      updateSquare model 
+      |> Update.none
     _ -> Update.none model
 
 nextFrame : Posix -> Model -> ( Model, Cmd Msg )
@@ -80,14 +82,16 @@ cell index active =
   let class = if active == index then "cell active" else "cell" in
   Html.div [ Attributes.class class ] []
 
+generateCells : Model -> Int -> List (Html msg)
+generateCells coloredSquare n =
+  case n of
+    0 -> []
+    _ -> cell (n-1) coloredSquare.coloredSquare  :: generateCells coloredSquare (n-1)
+
 movingSquare : Model -> Html msg
-movingSquare { coloredSquare } =
+movingSquare coloredSquare =
   Html.div [ Attributes.class "grid" ]
-    [ cell 0 coloredSquare
-    , cell 1 coloredSquare
-    , cell 3 coloredSquare
-    , cell 2 coloredSquare
-    ]
+    (generateCells coloredSquare (40*40))
 
 actualTime : Model -> Html msg
 actualTime { time } =
