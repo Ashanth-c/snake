@@ -51,11 +51,10 @@ img {
 
 .grid {
   display: grid;
-  width: 300px;
-  height: 300px;
-  gap: 24px;
-  grid-template-rows: repeat(2, 1fr);
-  grid-template-columns: repeat(2, 1fr);
+  width: 600px;
+  height: 600px;
+  grid-template-rows: repeat(40, 1fr);
+  grid-template-columns: repeat(40, 1fr);
   border: 2px solid #888;
   padding: 24px;
   margin: 24px auto;
