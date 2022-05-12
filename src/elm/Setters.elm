@@ -14,6 +14,9 @@ setGameStarted gameStarted record = { record | gameStarted = gameStarted }
 setGameStartedIn : { a | gameStarted : b } -> b -> { a | gameStarted : b }
 setGameStartedIn = flip setGameStarted
 
+setApple : { a | gameStarted : b } -> b -> { a | gameStarted : b }
+setApple = flip setGameStarted
+
 setColoredSquare : b -> { a | coloredSquare : b } -> { a | coloredSquare : b }
 setColoredSquare coloredSquare record = { record | coloredSquare = coloredSquare }
 

@@ -1,6 +1,7 @@
 module Main exposing (..)
 
 import Browser
+import Random
 import Browser.Events
 import Html exposing (Html)
 import Html.Attributes as Attributes
@@ -16,16 +17,27 @@ type alias Model =
   { gameStarted : Bool
   , lastUpdate : Int
   , time : Int
+  , grid : List String
   , coloredSquare : Int
+  , snake : List Int
+  , apple : Int
   , currentMove : Key
   , length : Int
+
   }
 
 init : Flags -> ( Model, Cmd Msg )
 init { now } =
   now
-  |> \time -> Model False time time 0 Space 40
+  |> \time -> Model False time time (initGrid [] 0) 0 [0] 150 Space 40
   |> Update.none
+
+initGrid : List String -> Int -> List String
+initGrid grid n = 
+  if (n /= 400) then
+    grid
+  else
+    initGrid grid n
 
 {-| All your messages should go there -}
 type Key = ArrowUp | ArrowRight | ArrowDown | ArrowLeft | Space
@@ -33,6 +45,19 @@ type Msg
   = NextFrame Posix
   | ToggleGameLoop
   | KeyDown Key
+  | CollisionAppleSnake
+  | NewAppleRandomPosition Int
+
+
+updateApple : Model -> Model
+updateApple ({ apple, snake } as model) =
+  case snake of
+    header::rest ->
+      if (apple == header) then
+          {model | apple = model.apple}
+      else 
+        {model | apple = model.apple}
+    [] -> {model | apple = model.apple}
 
 {-| Manage all your updates here, from the main update function to each
  -|   subfunction. You can use the helpers in Update.elm to help construct
@@ -81,7 +106,6 @@ updateSquare model choice =
       |> modBy (model.length*model.length)
       |> Setters.setColoredSquareIn model
 
-
 updateCurrentMove : Model -> Key -> Model
 updateCurrentMove model currentMove =
   case currentMove of 
@@ -90,6 +114,21 @@ updateCurrentMove model currentMove =
     ArrowRight -> if(model.currentMove /= ArrowLeft) then { model | currentMove = currentMove } else model
     ArrowUp -> if(model.currentMove /= ArrowDown) then { model | currentMove = currentMove } else model
     ArrowDown -> if(model.currentMove /= ArrowUp) then { model | currentMove = currentMove } else model
+
+isSnakePart: Int -> List Int -> Bool
+isSnakePart elem snake =
+  case snake of
+      [] -> False
+      head::rest ->
+        if (elem == head) then
+          True
+        else
+          isSnakePart elem rest
+
+randomPosition : Cmd Msg
+randomPosition =
+    let r = Random.int 1 400 in
+    Random.generate NewAppleRandomPosition r
 
 toggleGameLoop : Model -> ( Model, Cmd Msg )
 toggleGameLoop ({ gameStarted } as model) =
@@ -118,11 +157,12 @@ keyDown key model =
 nextFrame : Posix -> Model -> ( Model, Cmd Msg )
 nextFrame time model =
   let time_ = Time.posixToMillis time in
-  if time_ - model.lastUpdate >= 1000 then
+  if time_ - model.lastUpdate >= 150 then
     updateSquare model model.currentMove
     |> Setters.setTime time_
     |> Setters.setLastUpdate time_
     |> Update.none
+
   else
     time_
     |> Setters.setTimeIn model
@@ -135,23 +175,38 @@ update msg model =
     ToggleGameLoop -> toggleGameLoop model
     KeyDown key -> keyDown key model
     NextFrame time -> nextFrame time model
+    CollisionAppleSnake -> (model,randomPosition)
+    NewAppleRandomPosition pos -> 
+        case model.snake of
+          [] -> {model | apple = model.apple } |> Update.none
+          s ->
+            if (isSnakePart pos s) then 
+              (model,randomPosition) 
+            else
+              {model | apple = pos } |> Update.none
+
 
 {-| Manage all your view functions here. -}
-cell : Int -> Int -> Html msg
-cell index active =
-  let class = if active == index then "cell active" else "cell" in
+cell : Int -> Model -> Html msg 
+cell index ({ coloredSquare, apple } as model) =
+  let class = if index == coloredSquare then 
+                "cell active" 
+              else if apple == index then 
+                "cell activeApple"
+              else "cell"
+  in
   Html.div [ Attributes.class class ] []
 
 generateCells : Model -> Int -> List (Html msg)
 generateCells model n =
   case n of
     0 -> []
-    _ -> generateCells model (n-1) ++ [cell (n-1) model.coloredSquare]
+    _ -> generateCells model (n-1) ++ [cell (n-1) model]
 
 movingSquare : Model -> Html msg
-movingSquare model =
+movingSquare coloredSquare =
   Html.div [ Attributes.class "grid" ]
-    (generateCells model (model.length*model.length))
+   (generateCells coloredSquare (40*40))
 
 actualTime : Model -> Html msg
 actualTime { time } =
@@ -183,6 +238,7 @@ view model =
     [ Html.img [ Attributes.src "/logo.svg" ] []
     , explanations model
     , movingSquare model
+
     ]
 
 {-| Parts for the runtime. Get key presses and subscribe to
