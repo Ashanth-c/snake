@@ -17,12 +17,14 @@ type alias Model =
   , lastUpdate : Int
   , time : Int
   , coloredSquare : Int
+  , currentMove : Key
+  , length : Int
   }
 
 init : Flags -> ( Model, Cmd Msg )
 init { now } =
   now
-  |> \time -> Model False time time 0
+  |> \time -> Model False time time 0 Space 40
   |> Update.none
 
 {-| All your messages should go there -}
@@ -35,29 +37,59 @@ type Msg
 {-| Manage all your updates here, from the main update function to each
  -|   subfunction. You can use the helpers in Update.elm to help construct
  -|   Cmds. -}
-updateSquare : Model -> String -> Model
-updateSquare ({ coloredSquare } as model) choice =
+updateSquare : Model -> Key -> Model
+updateSquare model choice =
   case choice of
-    "right" -> 
-      coloredSquare + 1
-      |> modBy (40*40)
+    ArrowRight ->
+        if(modBy (model.length-1) model.coloredSquare == 0 && model.coloredSquare /= 0) then 
+          model.coloredSquare
+          |> modBy (model.length*model.length)
+          |> Setters.setColoredSquareIn model
+        else
+          model.coloredSquare + 1
+          |> modBy (model.length*model.length)
+          |> Setters.setColoredSquareIn model
+    ArrowLeft ->
+        if(modBy model.length model.coloredSquare == 0) then 
+          model.coloredSquare
+          |> modBy (model.length*model.length)
+          |> Setters.setColoredSquareIn model
+        else
+        model.coloredSquare - 1
+        |> modBy (model.length*model.length)
+        |> Setters.setColoredSquareIn model
+    ArrowDown -> 
+      if(model.coloredSquare >= (model.length * model.length) - (1+model.length)) then 
+          model.coloredSquare
+          |> modBy (model.length*model.length)
+          |> Setters.setColoredSquareIn model
+      else
+        model.coloredSquare + model.length
+        |> modBy (model.length*model.length)
+        |> Setters.setColoredSquareIn model
+    ArrowUp ->
+      if(model.coloredSquare <= (model.length-1)) then 
+          model.coloredSquare
+          |> modBy (model.length*model.length)
+          |> Setters.setColoredSquareIn model
+      else
+        model.coloredSquare - model.length
+        |> modBy (model.length*model.length)
+        |> Setters.setColoredSquareIn model
+    Space ->
+      model.coloredSquare
+      |> modBy (model.length*model.length)
       |> Setters.setColoredSquareIn model
-    "left" ->
-      coloredSquare - 1
-      |> modBy (40*40)
-      |> Setters.setColoredSquareIn model
-    "down" -> 
-      coloredSquare + 40
-      |> modBy (40*40)
-      |> Setters.setColoredSquareIn model
-    "up" ->
-      coloredSquare - 40
-      |> modBy (40*40)
-      |> Setters.setColoredSquareIn model
-    _ ->
-      coloredSquare +1
-      |> modBy (40*40)
-      |> Setters.setColoredSquareIn model
+
+
+updateCurrentMove : Model -> Key -> Model
+updateCurrentMove model currentMove =
+  case currentMove of 
+    Space -> { model | currentMove = currentMove }
+    ArrowLeft -> if(model.currentMove /= ArrowRight) then { model | currentMove = currentMove } else model
+    ArrowRight -> if(model.currentMove /= ArrowLeft) then { model | currentMove = currentMove } else model
+    ArrowUp -> if(model.currentMove /= ArrowDown) then { model | currentMove = currentMove } else model
+    ArrowDown -> if(model.currentMove /= ArrowUp) then { model | currentMove = currentMove } else model
 
 toggleGameLoop : Model -> ( Model, Cmd Msg )
 toggleGameLoop ({ gameStarted } as model) =
@@ -71,23 +103,23 @@ keyDown key model =
     Space -> 
       update ToggleGameLoop model
     ArrowLeft -> 
-      updateSquare model "left"
+      updateCurrentMove model key
       |> Update.none
     ArrowRight -> 
-      updateSquare model "right"
+      updateCurrentMove model ArrowRight
       |> Update.none
     ArrowUp -> 
-      updateSquare model "up"
+      updateCurrentMove model ArrowUp
       |> Update.none
     ArrowDown -> 
-      updateSquare model "down"
+      updateCurrentMove model ArrowDown
       |> Update.none
 
 nextFrame : Posix -> Model -> ( Model, Cmd Msg )
 nextFrame time model =
   let time_ = Time.posixToMillis time in
   if time_ - model.lastUpdate >= 1000 then
-    updateSquare model ""
+    updateSquare model model.currentMove
     |> Setters.setTime time_
     |> Setters.setLastUpdate time_
     |> Update.none
@@ -111,15 +143,15 @@ cell index active =
   Html.div [ Attributes.class class ] []
 
 generateCells : Model -> Int -> List (Html msg)
-generateCells coloredSquare n =
+generateCells model n =
   case n of
     0 -> []
-    _ -> generateCells coloredSquare (n-1) ++ [cell (n-1) coloredSquare.coloredSquare]
+    _ -> generateCells model (n-1) ++ [cell (n-1) model.coloredSquare]
 
 movingSquare : Model -> Html msg
-movingSquare coloredSquare =
+movingSquare model =
   Html.div [ Attributes.class "grid" ]
-    (generateCells coloredSquare (40*40))
+    (generateCells model (model.length*model.length))
 
 actualTime : Model -> Html msg
 actualTime { time } =
