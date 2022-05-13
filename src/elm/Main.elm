@@ -39,48 +39,46 @@ type Msg
  -|   Cmds. -}
 updateSquare : Model -> Key -> Model
 updateSquare model choice =
-  case choice of
-    ArrowRight ->
-        if(modBy (model.length-1) model.coloredSquare == 0 && model.coloredSquare /= 0) then 
-          model.coloredSquare
-          |> modBy (model.length*model.length)
-          |> Setters.setColoredSquareIn model
-        else
-          model.coloredSquare + 1
-          |> modBy (model.length*model.length)
-          |> Setters.setColoredSquareIn model
-    ArrowLeft ->
-        if(modBy model.length model.coloredSquare == 0) then 
-          model.coloredSquare
-          |> modBy (model.length*model.length)
-          |> Setters.setColoredSquareIn model
-        else
+  if (isGoodStep model choice (position model model.coloredSquare)) then 
+    case choice of
+      ArrowRight ->
+        model.coloredSquare + 1
+        |> modBy (model.length*model.length)
+        |> Setters.setColoredSquareIn model
+      ArrowLeft ->
         model.coloredSquare - 1
         |> modBy (model.length*model.length)
         |> Setters.setColoredSquareIn model
-    ArrowDown -> 
-      if(model.coloredSquare >= (model.length * model.length) - (1+model.length)) then 
-          model.coloredSquare
-          |> modBy (model.length*model.length)
-          |> Setters.setColoredSquareIn model
-      else
+      ArrowDown -> 
         model.coloredSquare + model.length
         |> modBy (model.length*model.length)
         |> Setters.setColoredSquareIn model
-    ArrowUp ->
-      if(model.coloredSquare <= (model.length-1)) then 
-          model.coloredSquare
-          |> modBy (model.length*model.length)
-          |> Setters.setColoredSquareIn model
-      else
+      ArrowUp ->
         model.coloredSquare - model.length
         |> modBy (model.length*model.length)
         |> Setters.setColoredSquareIn model
-    Space ->
-      model.coloredSquare
-      |> modBy (model.length*model.length)
-      |> Setters.setColoredSquareIn model
+      Space ->
+        model.coloredSquare
+        |> modBy (model.length*model.length)
+        |> Setters.setColoredSquareIn model
+  else
+    model.coloredSquare
+    |> modBy (model.length*model.length)
+    |> Setters.setColoredSquareIn model
 
+position : Model -> Int -> (Int, Int)
+position model i = 
+  ((i // model.length), modBy model.length i)
+
+isGoodStep : Model -> Key -> (Int, Int)-> Bool
+isGoodStep model key pos= 
+  case key of
+      ArrowRight ->  let (a, b) = pos in b < 39
+      ArrowLeft ->  let (a, b) = pos in b > 0
+      ArrowUp -> let (a, b) = pos in a > 0
+      ArrowDown ->  let (a, b) = pos in a < 39
+      Space -> True
+      
 
 updateCurrentMove : Model -> Key -> Model
 updateCurrentMove model currentMove =
@@ -118,7 +116,7 @@ keyDown key model =
 nextFrame : Posix -> Model -> ( Model, Cmd Msg )
 nextFrame time model =
   let time_ = Time.posixToMillis time in
-  if time_ - model.lastUpdate >= 1000 then
+  if time_ - model.lastUpdate >= 150 then
     updateSquare model model.currentMove
     |> Setters.setTime time_
     |> Setters.setLastUpdate time_
