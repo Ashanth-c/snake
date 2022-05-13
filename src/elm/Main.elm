@@ -31,7 +31,7 @@ type alias Model =
 init : Flags -> ( Model, Cmd Msg )
 init { now } =
   now
-  |> \time -> Model False time time (initGrid [] 0) (repeat 1 0) 150 Space 40
+  |> \time -> Model False time time (initGrid [] 0) (initialize 4 (\n -> n+160)) 150 Space 40
   |> Update.none
 
 initGrid : List String -> Int -> List String
@@ -62,13 +62,14 @@ snakeMove snake nextStep =
   let 
     newHeadPosition = Array.repeat 1 nextStep
     snakeBody = Array.slice 0 ( ( Array.length snake ) - 1 ) snake
+    a = Debug.log "" snakeBody
   in
   Array.append newHeadPosition snakeBody
 
 
 isCollisionApple : Model -> Bool
 isCollisionApple ({ apple, snake } as model) =
-  let     a = Debug.log "" (snakeHead snake == apple) in
+  let a = Debug.log "" (snakeHead snake == apple) in
   if (snakeHead snake == apple) then
     True
   else 
@@ -211,18 +212,32 @@ update msg model =
         {model | apple = pos } |> Update.none
 
 
+isSnakeCell : List Int -> Int -> Bool
+isSnakeCell snake index = 
+  case snake of 
+    [] -> False
+    head::rest ->
+      if (head == index) then
+        True
+      else 
+        isSnakeCell rest index
+
+
 {-| Manage all your view functions here. -}
 cell : Int -> Model -> Html msg 
 cell index ({ snake , apple } as model) =
   let 
     snakeH = snakeHead snake
-    class = if index == snakeH then 
-                "cell active" 
-              else if apple == index then 
+    class = if apple == index then 
                 "cell activeApple"
-              else "cell"
-      
+              else 
+                  if isSnakeCell (Array.toList snake) index then
+                    "cell active"
+                  else 
+                    "cell"
+    
   in
+
   Html.div [ Attributes.class class ] []
 
 generateCells : Model -> Int -> List (Html msg)
@@ -291,6 +306,7 @@ decodeKey =
 subscriptions : Model -> Sub Msg
 subscriptions { gameStarted } =
   let aF = Browser.Events.onAnimationFrame NextFrame
+  
       base = Browser.Events.onKeyDown decodeKey :: [] in
     Sub.batch (if gameStarted then aF :: base else base)
 
