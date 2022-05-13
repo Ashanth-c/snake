@@ -2,6 +2,7 @@ module Main exposing (..)
 
 import Browser
 import Random
+import Array exposing (Array)
 import Browser.Events
 import Html exposing (Html)
 import Html.Attributes as Attributes
@@ -10,6 +11,8 @@ import Time exposing (Posix)
 import Setters
 import Update
 import Json.Decode as Decode
+import Array exposing (initialize)
+import Array exposing (repeat)
 
 {-| Got from JS side, and Model to modify -}
 type alias Flags = { now : Int }
@@ -18,8 +21,7 @@ type alias Model =
   , lastUpdate : Int
   , time : Int
   , grid : List String
-  , coloredSquare : Int
-  , snake : List Int
+  , snake : Array Int
   , apple : Int
   , currentMove : Key
   , length : Int
@@ -29,7 +31,7 @@ type alias Model =
 init : Flags -> ( Model, Cmd Msg )
 init { now } =
   now
-  |> \time -> Model False time time (initGrid [] 0) 0 [0] 150 Space 40
+  |> \time -> Model False time time (initGrid [] 0) (repeat 1 0) 150 Space 40
   |> Update.none
 
 initGrid : List String -> Int -> List String
@@ -49,71 +51,96 @@ type Msg
   | NewAppleRandomPosition Int
 
 
-updateApple : Model -> Model
-updateApple ({ apple, snake } as model) =
-  case snake of
-    header::rest ->
-      if (apple == header) then
-          {model | apple = model.apple}
-      else 
-        {model | apple = model.apple}
-    [] -> {model | apple = model.apple}
+snakeHead: Array Int -> Int
+snakeHead snake = 
+  case (Array.get 0 snake) of 
+    Just a-> a
+    Nothing -> 0
+
+snakeMove: Array Int -> Int -> Array Int
+snakeMove snake nextStep =
+  let 
+    newHeadPosition = Array.repeat 1 nextStep
+    snakeBody = Array.slice 0 ( ( Array.length snake ) - 1 ) snake
+  in
+  Array.append newHeadPosition snakeBody
+
+
+isCollisionApple : Model -> Bool
+isCollisionApple ({ apple, snake } as model) =
+  let     a = Debug.log "" (snakeHead snake == apple) in
+  if (snakeHead snake == apple) then
+    True
+  else 
+    False
 
 {-| Manage all your updates here, from the main update function to each
  -|   subfunction. You can use the helpers in Update.elm to help construct
  -|   Cmds. -}
 updateSquare : Model -> Key -> Model
 updateSquare model choice =
+  let 
+    snakeH = (snakeHead model.snake) 
+  in
   case choice of
-    ArrowRight ->
-        if(modBy (model.length-1) model.coloredSquare == 0 && model.coloredSquare /= 0) then 
-          model.coloredSquare
-          |> modBy (model.length*model.length)
-          |> Setters.setColoredSquareIn model
-        else
-          model.coloredSquare + 1
-          |> modBy (model.length*model.length)
-          |> Setters.setColoredSquareIn model
-    ArrowLeft ->
-        if(modBy model.length model.coloredSquare == 0) then 
-          model.coloredSquare
-          |> modBy (model.length*model.length)
-          |> Setters.setColoredSquareIn model
-        else
-        model.coloredSquare - 1
+    ArrowRight -> 
+      if ( ( modBy (model.length - 1) (snakeHead model.snake) == 0)  && ( (snakeHead model.snake) /= 0) ) then 
+        snakeH
         |> modBy (model.length*model.length)
+        |> snakeMove model.snake
+        |> Setters.setColoredSquareIn model
+      else
+        snakeH + 1
+        |> modBy (model.length*model.length)
+        |> snakeMove model.snake
+        |> Setters.setColoredSquareIn model
+    ArrowLeft ->
+      if (modBy model.length snakeH == 0) then 
+        snakeH
+        |> modBy (model.length*model.length)
+        |> snakeMove model.snake
+        |> Setters.setColoredSquareIn model
+      else
+        snakeH- 1
+        |> modBy (model.length*model.length)
+        |> snakeMove model.snake
         |> Setters.setColoredSquareIn model
     ArrowDown -> 
-      if(model.coloredSquare >= (model.length * model.length) - (1+model.length)) then 
-          model.coloredSquare
-          |> modBy (model.length*model.length)
-          |> Setters.setColoredSquareIn model
-      else
-        model.coloredSquare + model.length
+      if (snakeH >= (model.length * model.length) - (1+model.length)) then 
+        snakeH
         |> modBy (model.length*model.length)
+        |> snakeMove model.snake
+        |> Setters.setColoredSquareIn model
+      else
+        snakeH + model.length
+        |> modBy (model.length*model.length)
+        |> snakeMove model.snake
         |> Setters.setColoredSquareIn model
     ArrowUp ->
-      if(model.coloredSquare <= (model.length-1)) then 
-          model.coloredSquare
-          |> modBy (model.length*model.length)
-          |> Setters.setColoredSquareIn model
-      else
-        model.coloredSquare - model.length
+      if (snakeH  <= ( model.length - 1 ) ) then 
+        snakeH
         |> modBy (model.length*model.length)
+        |> snakeMove model.snake 
+        |> Setters.setColoredSquareIn model
+      else
+        snakeH  - model.length
+        |> modBy (model.length*model.length)
+        |> snakeMove model.snake
         |> Setters.setColoredSquareIn model
     Space ->
-      model.coloredSquare
+      snakeH
       |> modBy (model.length*model.length)
+      |> snakeMove model.snake
       |> Setters.setColoredSquareIn model
 
 updateCurrentMove : Model -> Key -> Model
 updateCurrentMove model currentMove =
   case currentMove of 
     Space -> { model | currentMove = currentMove }
-    ArrowLeft -> if(model.currentMove /= ArrowRight) then { model | currentMove = currentMove } else model
-    ArrowRight -> if(model.currentMove /= ArrowLeft) then { model | currentMove = currentMove } else model
-    ArrowUp -> if(model.currentMove /= ArrowDown) then { model | currentMove = currentMove } else model
-    ArrowDown -> if(model.currentMove /= ArrowUp) then { model | currentMove = currentMove } else model
+    ArrowLeft -> if (model.currentMove /= ArrowRight) then { model | currentMove = currentMove } else model
+    ArrowRight -> if (model.currentMove /= ArrowLeft) then { model | currentMove = currentMove } else model
+    ArrowUp -> if (model.currentMove /= ArrowDown) then { model | currentMove = currentMove } else model
+    ArrowDown -> if (model.currentMove /= ArrowUp) then { model | currentMove = currentMove } else model
 
 isSnakePart: Int -> List Int -> Bool
 isSnakePart elem snake =
@@ -156,13 +183,14 @@ keyDown key model =
 
 nextFrame : Posix -> Model -> ( Model, Cmd Msg )
 nextFrame time model =
-  let time_ = Time.posixToMillis time in
+  let 
+    time_ = Time.posixToMillis time
+  in
   if time_ - model.lastUpdate >= 150 then
     updateSquare model model.currentMove
     |> Setters.setTime time_
     |> Setters.setLastUpdate time_
     |> Update.none
-
   else
     time_
     |> Setters.setTimeIn model
@@ -176,24 +204,24 @@ update msg model =
     KeyDown key -> keyDown key model
     NextFrame time -> nextFrame time model
     CollisionAppleSnake -> (model,randomPosition)
-    NewAppleRandomPosition pos -> 
-        case model.snake of
-          [] -> {model | apple = model.apple } |> Update.none
-          s ->
-            if (isSnakePart pos s) then 
-              (model,randomPosition) 
-            else
-              {model | apple = pos } |> Update.none
+    NewAppleRandomPosition pos ->
+      if (isCollisionApple model) then
+        (model,randomPosition) 
+      else 
+        {model | apple = pos } |> Update.none
 
 
 {-| Manage all your view functions here. -}
 cell : Int -> Model -> Html msg 
-cell index ({ coloredSquare, apple } as model) =
-  let class = if index == coloredSquare then 
+cell index ({ snake , apple } as model) =
+  let 
+    snakeH = snakeHead snake
+    class = if index == snakeH then 
                 "cell active" 
               else if apple == index then 
                 "cell activeApple"
               else "cell"
+      
   in
   Html.div [ Attributes.class class ] []
 
@@ -274,4 +302,5 @@ main =
     , init = init
     , update = update
     , subscriptions = subscriptions
+    
     }
