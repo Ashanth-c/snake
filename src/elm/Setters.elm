@@ -14,10 +14,13 @@ setGameStarted gameStarted record = { record | gameStarted = gameStarted }
 setGameStartedIn : { a | gameStarted : b } -> b -> { a | gameStarted : b }
 setGameStartedIn = flip setGameStarted
 
-setColoredSquare : b -> { a | coloredSquare : b } -> { a | coloredSquare : b }
-setColoredSquare coloredSquare record = { record | coloredSquare = coloredSquare }
+setApple : { a | gameStarted : b } -> b -> { a | gameStarted : b }
+setApple = flip setGameStarted
 
-setColoredSquareIn : { a | coloredSquare : b } -> b -> { a | coloredSquare : b }
+setColoredSquare : b -> { a | snake : b } -> { a | snake : b }
+setColoredSquare snake record = { record | snake = snake }
+
+setColoredSquareIn : { a | snake : b } -> b -> { a | snake : b }
 setColoredSquareIn = flip setColoredSquare
 
 setLastUpdate : b -> { a | lastUpdate : b } -> { a | lastUpdate : b }
