@@ -2,17 +2,22 @@ module Main exposing (..)
 
 import Browser
 import Random
-import Array exposing (Array)
-import Browser.Events
-import Html exposing (Html)
-import Html.Attributes as Attributes
-import Html.Events as Events
-import Time exposing (Posix)
 import Setters
 import Update
+import Browser.Events
+import Html exposing (option)
+import Html.Attributes exposing (value)
+import Html exposing (text)
+import Debug exposing (toString)
+import Html exposing (Html)
+import Html exposing (Html)
+import Html.Attributes as Attributes exposing (..)
+import Html.Events as Events
+import Time exposing (Posix)
 import Json.Decode as Decode
-import Array exposing (initialize)
-import Array exposing (repeat)
+import Array exposing (..)
+import Html exposing (..)
+import Html.Events exposing (targetValue)
 
 {-| Got from JS side, and Model to modify -}
 type alias Flags = { now : Int }
@@ -20,25 +25,19 @@ type alias Model =
   { gameStarted : Bool
   , lastUpdate : Int
   , time : Int
-  , grid : List String
   , snake : Array Int
   , apple : Int
   , currentMove : Key
   , length : Int
+  , score : Int
+  , wall : Bool
   }
 
 init : Flags -> ( Model, Cmd Msg )
 init { now } =
   now
-  |> \time -> Model False time time (initGrid [] 0) (initialize 4 (\n -> n+1)) 150 Space 40
-  |> Update.none
-
-initGrid : List String -> Int -> List String
-initGrid grid n = 
-  if (n /= 400) then
-    grid
-  else
-    initGrid grid n
+  |> \time -> Model False time time (initialize 4 (\n -> n+1)) 84 Space 40 0 False
+  |> changeApple
 
 {-| All your messages should go there -}
 type Key = ArrowUp | ArrowRight | ArrowDown | ArrowLeft | Space
@@ -46,9 +45,8 @@ type Msg
   = NextFrame Posix
   | ToggleGameLoop
   | KeyDown Key
-  | CollisionAppleSnake
   | NewAppleRandomPosition Int
-
+  | ChangeGridSize Int
 
 snakeHead: Array Int -> Int
 snakeHead snake = 
@@ -74,10 +72,27 @@ addSnakePart snake =
   Nothing -> snake
   Just a -> (Array.push a snake)
 
+updateScore : Int -> Model -> Model
+updateScore scoreToAdd model = 
+  {model | score = (model.score + scoreToAdd)}
+
+
+scoreForPassedTime : Posix -> Model -> Model
+scoreForPassedTime time model = 
+  let 
+      time_ = Time.posixToMillis time
+      timeInSecond = (modBy 60 (time_ // 1000))
+      lastTimeInSecond = (modBy 60 (model.lastUpdate // 1000))
+  in
+  if (timeInSecond - lastTimeInSecond >= 1) then
+    updateScore 10 model
+  else
+    model
+
 collisionApple : Model -> Model
 collisionApple ({ snake } as model) =
   if isCollisionApple model then
-    {model | snake = addSnakePart snake }
+    {model | snake = addSnakePart snake } |> updateScore 100
   else 
     {model | snake = model.snake}
 
@@ -86,9 +101,10 @@ changeApple : Model -> (Model,Cmd Msg)
 changeApple model = 
   if isCollisionApple model then
     model
-    |> Update.withCmd randomPosition
+    |> Update.withCmd (randomPositionApple model.length)
   else
     model |> Update.none
+    
 isCollisionApple : Model -> Bool
 isCollisionApple ({ apple, snake } as model) =
   if (snakeHead snake == apple) then
@@ -149,10 +165,10 @@ position model i =
 isGoodStep : Model -> Key -> (Int, Int)-> Bool
 isGoodStep model key pos= 
   case key of
-      ArrowRight ->  let (a, b) = pos in b < 39
+      ArrowRight ->  let (a, b) = pos in b < (model.length - 1)
       ArrowLeft ->  let (a, b) = pos in b > 0
       ArrowUp -> let (a, b) = pos in a > 0
-      ArrowDown ->  let (a, b) = pos in a < 39
+      ArrowDown ->  let (a, b) = pos in a < (model.length - 1)
       Space -> True
       
 
@@ -175,11 +191,10 @@ isSnakePart elem snake =
         else
           isSnakePart elem rest
 
-randomPosition : Cmd Msg
-randomPosition =
+randomPositionApple : Int -> Cmd Msg
+randomPositionApple size =
     let 
-      r = Random.int 1 (40*40) 
-      a = Debug.log "aa"
+      r = Random.int 1 (size*size) 
     in
     Random.generate NewAppleRandomPosition r
 
@@ -215,6 +230,7 @@ nextFrame time model =
   if time_ - model.lastUpdate >= 150 then
     updateSquare model model.currentMove
     |> collisionApple 
+    |> scoreForPassedTime time 
     |> Setters.setTime time_
     |> Setters.setLastUpdate time_
     |> changeApple
@@ -230,10 +246,20 @@ update msg model =
     ToggleGameLoop -> toggleGameLoop model
     KeyDown key -> keyDown key model
     NextFrame time -> nextFrame time model
-    CollisionAppleSnake -> (model,randomPosition)
+    ChangeGridSize gridSize -> 
+      case gridSize of 
+      10  -> Model False model.lastUpdate  model.time (initialize 4 (\n -> n+1)) 84 Space gridSize 0 model.wall |> Update.none
+      20 -> Model False model.lastUpdate model.time (initialize 4 (\n -> n+1)) 152 Space gridSize 0 model.wall  |> Update.none 
+      40 -> Model False model.lastUpdate model.time (initialize 4 (\n -> n+1)) 150 Space gridSize 0 model.wall |> Update.none 
+      _-> model |> Update.none
     NewAppleRandomPosition pos ->
       if (isCollisionApple model) then
-        {model | apple = pos } |> Update.none
+        if (pos == (snakeHead model.snake) ) then
+          model     
+          |> Update.withCmd (randomPositionApple model.length)
+        else
+          {model | apple = pos } |> Update.none
+
       else 
         {model | apple = model.apple } |> Update.none
 
@@ -274,14 +300,14 @@ generateCells model n =
 
 movingSquare : Model -> Html msg
 movingSquare coloredSquare =
-  Html.div [ Attributes.class "grid" ]
-   (generateCells coloredSquare (40*40))
+  Html.div ([ Attributes.class "grid" ] ++ gridStyle (String.fromInt coloredSquare.length) )
+   (generateCells coloredSquare (coloredSquare.length*coloredSquare.length))
 
 actualTime : Model -> Html msg
-actualTime { time } =
-  Html.div [ Attributes.class "actual-time" ]
-    [ Html.text "Actual time"
-    , time
+actualTime { score } =
+  Html.div [ Attributes.class "actual-score" ]
+    [ Html.text "SCORE"
+    , score
       |> String.fromInt
       |> Html.text
       |> List.singleton
@@ -297,18 +323,53 @@ explanations ({ gameStarted } as model) =
     , actualTime model
     , Html.button
       [ Events.onClick ToggleGameLoop, Attributes.class "btn" ]
-      [ Html.text (String.join " " [word, "game loop"]) ]
+      [ Html.text (String.join " " [word, "game"]) ]
     ]
+targetValueRoleDecoder : Decode.Decoder Int 
+targetValueRoleDecoder = 
+  targetValue |> Decode.andThen (\val -> 
+    case val of 
+    "40" -> Decode.succeed 40 
+    "20" -> Decode.succeed 20 
+    "10" -> Decode.succeed  10
+    _-> Decode.fail ("Invalid Role: " ++ val) ) 
+
+gameParameters : Model -> Html Msg
+gameParameters model = 
+  Html.div [ Attributes.class "game-parameters" ]  
+   [ Html.div[] 
+      [ Html.text "Active border wall" , input[ type_ "checkbox" ] [] ]
+      ,Html.div[] 
+      [ Html.text "Active wall obstacle" , input[ type_ "checkbox" ] [] ]
+      ,Html.div [] 
+             [ Html.text "Grid size ",
+             select
+                [ Events.on "change" (Decode.map ChangeGridSize targetValueRoleDecoder) 
+                ]
+                [   viewOption 40
+                    , viewOption 20
+                    , viewOption 10
+                  ]
+              ]
+          ]
+
+
+viewOption : Int -> Html Msg
+viewOption length =
+  option
+    [ value <| toString length ]
+    [ text <| toString length ]
+      
 
 {-| Main view functions, composing all functions in one -}
 view : Model -> Html Msg
 view model =
   Html.main_ []
     [
-    explanations model
-    , movingSquare model
-
-    ]
+    explanations model,
+    gameParameters model,
+    movingSquare model
+  ]
 
 {-| Parts for the runtime. Get key presses and subscribe to
  -|   requestAnimationFrame for the game loop. You don't have to bother with
@@ -332,9 +393,21 @@ decodeKey =
 subscriptions : Model -> Sub Msg
 subscriptions { gameStarted } =
   let aF = Browser.Events.onAnimationFrame NextFrame
-  
       base = Browser.Events.onKeyDown decodeKey :: [] in
     Sub.batch (if gameStarted then aF :: base else base)
+
+
+gridStyle : String -> List (Attribute msg)
+gridStyle size =
+    [ style "display" "grid"
+    , style "width" "600px"
+    , style "height" "600px"
+    , style "grid-template-rows" ("repeat("++size++" , 1fr)")
+    , style "grid-template-columns" ("repeat("++size++" , 1fr)")
+    , style "margin" "24px auto"
+    , style "border" "1px solid #888"
+    , style "background" "white"
+    ]
 
 {-| Entrypoint of your program -}
 main : Program Flags Model Msg
