@@ -30,7 +30,7 @@ type alias Model =
 init : Flags -> ( Model, Cmd Msg )
 init { now } =
   now
-  |> \time -> Model False time time (initGrid [] 0) (initialize 4 (\n -> n+160)) 150 Space 40
+  |> \time -> Model False time time (initGrid [] 0) (initialize 4 (\n -> n+1)) 150 Space 40
   |> Update.none
 
 initGrid : List String -> Int -> List String
@@ -69,21 +69,26 @@ addSnakePart : Array Int -> Array Int
 addSnakePart snake =
   let 
     newPartPosition = Array.get ( (Array.length snake) - 1 ) snake 
-    ab = Debug.log "" newPartPosition
-    bbb = Debug.log "" snake
-
   in
   case newPartPosition of 
   Nothing -> snake
   Just a -> (Array.push a snake)
 
 collisionApple : Model -> Model
-collisionApple ({ apple, snake } as model) =
+collisionApple ({ snake } as model) =
   if isCollisionApple model then
     {model | snake = addSnakePart snake }
   else 
     {model | snake = model.snake}
 
+
+changeApple : Model -> (Model,Cmd Msg)
+changeApple model = 
+  if isCollisionApple model then
+    model
+    |> Update.withCmd randomPosition
+  else
+    model |> Update.none
 isCollisionApple : Model -> Bool
 isCollisionApple ({ apple, snake } as model) =
   if (snakeHead snake == apple) then
@@ -172,7 +177,10 @@ isSnakePart elem snake =
 
 randomPosition : Cmd Msg
 randomPosition =
-    let r = Random.int 1 400 in
+    let 
+      r = Random.int 1 (40*40) 
+      a = Debug.log "aa"
+    in
     Random.generate NewAppleRandomPosition r
 
 toggleGameLoop : Model -> ( Model, Cmd Msg )
@@ -209,7 +217,7 @@ nextFrame time model =
     |> collisionApple 
     |> Setters.setTime time_
     |> Setters.setLastUpdate time_
-    |> Update.none
+    |> changeApple
   else
     time_
     |> Setters.setTimeIn model
@@ -225,9 +233,9 @@ update msg model =
     CollisionAppleSnake -> (model,randomPosition)
     NewAppleRandomPosition pos ->
       if (isCollisionApple model) then
-        (model,randomPosition) 
-      else 
         {model | apple = pos } |> Update.none
+      else 
+        {model | apple = model.apple } |> Update.none
 
 
 isSnakeCell : List Int -> Int -> Bool
