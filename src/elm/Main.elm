@@ -61,28 +61,43 @@ snakeMove snake nextStep =
   let 
     newHeadPosition = Array.repeat 1 nextStep
     snakeBody = Array.slice 0 ( ( Array.length snake ) - 1 ) snake
-    a = Debug.log "" snakeBody
   in
   Array.append newHeadPosition snakeBody
 
 
+addSnakePart : Array Int -> Array Int
+addSnakePart snake =
+  let 
+    newPartPosition = Array.get ( (Array.length snake) - 1 ) snake 
+    ab = Debug.log "" newPartPosition
+    bbb = Debug.log "" snake
+
+  in
+  case newPartPosition of 
+  Nothing -> snake
+  Just a -> (Array.push a snake)
+
+collisionApple : Model -> Model
+collisionApple ({ apple, snake } as model) =
+  if isCollisionApple model then
+    {model | snake = addSnakePart snake }
+  else 
+    {model | snake = model.snake}
+
 isCollisionApple : Model -> Bool
 isCollisionApple ({ apple, snake } as model) =
-  let a = Debug.log "" (snakeHead snake == apple) in
   if (snakeHead snake == apple) then
     True
   else 
     False
+
 
 {-| Manage all your updates here, from the main update function to each
  -|   subfunction. You can use the helpers in Update.elm to help construct
  -|   Cmds. -}
 updateSquare : Model -> Key -> Model
 updateSquare model choice =
-  let 
-    snakeH = (snakeHead model.snake) 
-  in
-
+  let snakeH = (snakeHead model.snake) in
   if (isGoodStep model choice (position model snakeH)) then
     case choice of
       ArrowRight -> 
@@ -191,6 +206,7 @@ nextFrame time model =
   in
   if time_ - model.lastUpdate >= 150 then
     updateSquare model model.currentMove
+    |> collisionApple 
     |> Setters.setTime time_
     |> Setters.setLastUpdate time_
     |> Update.none
@@ -280,8 +296,8 @@ explanations ({ gameStarted } as model) =
 view : Model -> Html Msg
 view model =
   Html.main_ []
-    [ Html.img [ Attributes.src "/logo.svg" ] []
-    , explanations model
+    [
+    explanations model
     , movingSquare model
 
     ]
