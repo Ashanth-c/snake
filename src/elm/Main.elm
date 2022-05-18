@@ -46,7 +46,6 @@ type Msg
   = NextFrame Posix
   | ToggleGameLoop
   | KeyDown Key
-  | CollisionAppleSnake
   | NewAppleRandomPosition Int
 
 
@@ -56,13 +55,16 @@ snakeHead snake =
     Just a-> a
     Nothing -> 0
 
+snakeBody: Array Int -> Array Int
+snakeBody snake = Array.slice 1 ( ( Array.length snake ) - 1 ) snake
+
 snakeMove: Array Int -> Int -> Array Int
 snakeMove snake nextStep =
   let 
     newHeadPosition = Array.repeat 1 nextStep
-    snakeBody = Array.slice 0 ( ( Array.length snake ) - 1 ) snake
+    body = Array.slice 0 ( ( Array.length snake ) - 1 ) snake
   in
-  Array.append newHeadPosition snakeBody
+  Array.append newHeadPosition body
 
 
 addSnakePart : Array Int -> Array Int
@@ -82,6 +84,13 @@ collisionApple ({ snake } as model) =
     {model | snake = model.snake}
 
 
+collisionBody : Model -> Model
+collisionBody ({ snake } as model) =
+  if isCollisionBody (snakeBody snake) model then
+    {model | gameStarted = True }
+  else 
+    {model | gameStarted = False }
+
 changeApple : Model -> (Model,Cmd Msg)
 changeApple model = 
   if isCollisionApple model then
@@ -95,6 +104,14 @@ isCollisionApple ({ apple, snake } as model) =
     True
   else 
     False
+
+isCollisionBody : Array Int -> Model -> Bool
+isCollisionBody body model =
+  let bodyParts = Debug.log "" model.snake 
+  in
+  case Array.toList body of 
+      [] -> False
+      part::rest -> if part == snakeHead model.snake then True else False || isCollisionBody (Array.fromList rest) model 
 
 
 {-| Manage all your updates here, from the main update function to each
@@ -214,7 +231,8 @@ nextFrame time model =
   in
   if time_ - model.lastUpdate >= 150 then
     updateSquare model model.currentMove
-    |> collisionApple 
+    |> collisionApple
+    |> collisionBody
     |> Setters.setTime time_
     |> Setters.setLastUpdate time_
     |> changeApple
@@ -230,7 +248,6 @@ update msg model =
     ToggleGameLoop -> toggleGameLoop model
     KeyDown key -> keyDown key model
     NextFrame time -> nextFrame time model
-    CollisionAppleSnake -> (model,randomPosition)
     NewAppleRandomPosition pos ->
       if (isCollisionApple model) then
         {model | apple = pos } |> Update.none
