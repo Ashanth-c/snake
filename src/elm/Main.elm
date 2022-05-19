@@ -102,10 +102,10 @@ collisionApple ({ snake } as model) =
 
 collisionBody : Model -> Model
 collisionBody ({ snake } as model) =
-  if isCollisionBody (snakeBody snake) model then
-    {model | gameStarted = True }
-  else 
+  if isCollisionBody (snakeBody snake) (snakeHead snake) then
     {model | gameStarted = False }
+  else 
+    {model | gameStarted = True }
 
 changeApple : Model -> (Model,Cmd Msg)
 changeApple model = 
@@ -114,18 +114,19 @@ changeApple model =
     |> Update.withCmd (randomPositionApple model.length)
   else
     model |> Update.none
+
     
 isCollisionApple : Model -> Bool
 isCollisionApple ({ apple, snake } as model) =
   snakeHead snake == apple
 
-isCollisionBody : Array Int -> Model -> Bool
-isCollisionBody body model =
-  let bodyParts = Debug.log "" model.snake 
+isCollisionBody : Array Int -> Int -> Bool
+isCollisionBody body head =
+  let bodyParts = Debug.log "" body
   in
   case Array.toList body of 
     [] -> False
-    part::rest -> if part == snakeHead model.snake then True else False || isCollisionBody (Array.fromList rest) model 
+    part::rest -> if part == head then True else False || isCollisionBody (Array.fromList rest) head 
 
 
 {-| Manage all your updates here, from the main update function to each
