@@ -31,12 +31,13 @@ type alias Model =
   , length : Int
   , score : Int
   , wall : Bool
+  , limit : Bool
   }
 
 init : Flags -> ( Model, Cmd Msg )
 init { now } =
   now
-  |> \time -> Model False time time (Array.fromList [3, 2, 1, 0]) 84 ArrowRight 40 0 False
+  |> \time -> Model False time time (Array.fromList [3, 2, 1, 0]) 84 ArrowRight 40 0 False False
   |> changeApple
 
 {-| All your messages should go there -}
@@ -122,8 +123,6 @@ isCollisionApple ({ apple, snake } as model) =
 
 isCollisionBody : Array Int -> Int -> Bool
 isCollisionBody body head =
-  let bodyParts = Debug.log "" body
-  in
   case Array.toList body of 
     [] -> False
     part::rest -> if part == head then True else False || isCollisionBody (Array.fromList rest) head 
@@ -138,18 +137,28 @@ updateSquare model choice =
   if (isGoodStep model choice (position model snakeH)) then
     case choice of
       ArrowRight -> 
+        let (a, b) = (position model snakeH) in 
+
+        if (b == model.length - 1) then 
+          (a * (model.length - 1)) + (a)
+          |> modBy (model.length*model.length)
+          |> snakeMove model.snake
+          |> Setters.setColoredSquareIn model
+        else
           snakeH + 1
           |> modBy (model.length*model.length)
           |> snakeMove model.snake
           |> Setters.setColoredSquareIn model
       ArrowLeft ->
-        if (modBy model.length snakeH == 0) then 
-          snakeH
+        let (a, b) = Debug.log "" (position model snakeH) in 
+
+        if (b == 0) then 
+          (a * (model.length)) + (model.length - 1)
           |> modBy (model.length*model.length)
           |> snakeMove model.snake
           |> Setters.setColoredSquareIn model
         else
-          snakeH- 1
+          snakeH  - 1
           |> modBy (model.length*model.length)
           |> snakeMove model.snake
           |> Setters.setColoredSquareIn model
@@ -180,13 +189,15 @@ position model i =
 
 isGoodStep : Model -> Key -> (Int, Int)-> Bool
 isGoodStep model key pos= 
-  case key of
-      ArrowRight ->  let (a, b) = pos in b < (model.length - 1)
-      ArrowLeft ->  let (a, b) = pos in b > 0
-      ArrowUp -> let (a, b) = pos in a > 0
-      ArrowDown ->  let (a, b) = pos in a < (model.length - 1)
-      Space -> True
-      
+  case model.limit of 
+    False -> True
+    True -> case key of
+              ArrowRight ->  let (a, b) = pos in b < (model.length - 1)
+              ArrowLeft ->  let (a, b) = pos in b > 0
+              ArrowUp -> let (a, b) = pos in a > 0
+              ArrowDown ->  let (a, b) = pos in a < (model.length - 1)
+              Space -> True
+              
 
 updateCurrentMove : Model -> Key -> Model
 updateCurrentMove model currentMove =
@@ -265,9 +276,9 @@ update msg model =
     NextFrame time -> nextFrame time model
     ChangeGridSize gridSize -> 
       case gridSize of 
-      10  -> Model False model.lastUpdate  model.time (initialize 4 (\n -> n+1)) 84 Space gridSize 0 model.wall |> Update.none
-      20 -> Model False model.lastUpdate model.time (initialize 4 (\n -> n+1)) 152 Space gridSize 0 model.wall  |> Update.none 
-      40 -> Model False model.lastUpdate model.time (initialize 4 (\n -> n+1)) 150 Space gridSize 0 model.wall |> Update.none 
+      10  -> Model False model.lastUpdate  model.time (initialize 4 (\n -> n+1)) 84 Space gridSize 0 model.wall model.limit |> Update.none
+      20 -> Model False model.lastUpdate model.time (initialize 4 (\n -> n+1)) 152 Space gridSize 0 model.wall model.limit |> Update.none 
+      40 -> Model False model.lastUpdate model.time (initialize 4 (\n -> n+1)) 150 Space gridSize 0 model.wall model.limit |> Update.none 
       _-> model |> Update.none
     NewAppleRandomPosition pos ->
       if (isCollisionApple model) then
