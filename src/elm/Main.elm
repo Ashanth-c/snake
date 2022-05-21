@@ -37,7 +37,7 @@ type alias Model =
 init : Flags -> ( Model, Cmd Msg )
 init { now } =
   now
-  |> \time -> Model False time time (Array.fromList [3, 2, 1, 0]) 84 ArrowRight 40 0 False False
+  |> \time -> Model False time time (Array.fromList [3, 2, 1, 0]) 84 ArrowRight 40 0 False True
   |> changeApple
 
 {-| All your messages should go there -}
@@ -108,6 +108,13 @@ collisionBody ({ snake } as model) =
   else 
     {model | gameStarted = True }
 
+collisionWall : Model -> Model
+collisionWall ({ snake } as model) =
+  if isCollisionWall (snakeHead snake) model && model.limit then
+    {model | gameStarted = False }
+  else 
+    {model | gameStarted = True }
+
 changeApple : Model -> (Model,Cmd Msg)
 changeApple model = 
   if isCollisionApple model then
@@ -127,6 +134,15 @@ isCollisionBody body head =
     [] -> False
     part::rest -> if part == head then True else False || isCollisionBody (Array.fromList rest) head 
 
+isCollisionWall : Int -> Model -> Bool
+isCollisionWall head model =
+  let (a, b) = position model head in
+  case model.currentMove of  
+    ArrowDown -> a == model.length - 1
+    ArrowUp -> a == 0
+    ArrowLeft ->  b == 0
+    ArrowRight -> b == model.length - 1
+    Space -> False
 
 {-| Manage all your updates here, from the main update function to each
  -|   subfunction. You can use the helpers in Update.elm to help construct
@@ -150,7 +166,7 @@ updateSquare model choice =
           |> snakeMove model.snake
           |> Setters.setColoredSquareIn model
       ArrowLeft ->
-        let (a, b) = Debug.log "" (position model snakeH) in 
+        let (a, b) = (position model snakeH) in 
 
         if (b == 0) then 
           (a * (model.length)) + (model.length - 1)
