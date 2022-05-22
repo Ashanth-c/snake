@@ -63,6 +63,10 @@ img {
   background: rgb(233, 2, 2);
 }
 
+.wall {
+  background: rgb(0, 0, 0);
+}
+
 .actual-time {
   font-size: 1.2rem;
   font-weight: bold;

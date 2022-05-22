@@ -31,13 +31,14 @@ type alias Model =
   , length : Int
   , score : Int
   , wall : Bool
+  , walls : Array Int
   , limit : Bool
   }
 
 init : Flags -> ( Model, Cmd Msg )
 init { now } =
   now
-  |> \time -> Model False time time (Array.fromList [3, 2, 1, 0]) 84 ArrowRight 40 0 False True
+  |> \time -> Model False time time (Array.fromList [3, 2, 1, 0]) 84 ArrowRight 40 0 True (Array.fromList [10]) True
   |> changeApple
 
 {-| All your messages should go there -}
@@ -115,6 +116,13 @@ collisionWall ({ snake } as model) =
   else 
     {model | gameStarted = True }
 
+collisionWalls : Model -> Model
+collisionWalls ({ snake } as model) =
+  if isCollisionWalls (snakeHead snake) model.walls then
+    {model | gameStarted = False }
+  else 
+    {model | gameStarted = True }
+
 changeApple : Model -> (Model,Cmd Msg)
 changeApple model = 
   if isCollisionApple model then
@@ -143,6 +151,12 @@ isCollisionWall head model =
     ArrowLeft ->  b == 0
     ArrowRight -> b == model.length - 1
     Space -> False
+
+isCollisionWalls : Int -> Array Int -> Bool
+isCollisionWalls head walls =
+  case Array.toList walls of 
+    [] -> False
+    part::rest -> if part == head then True else False || isCollisionWalls head (Array.fromList rest) 
 
 {-| Manage all your updates here, from the main update function to each
  -|   subfunction. You can use the helpers in Update.elm to help construct
@@ -274,6 +288,7 @@ nextFrame time model =
     updateSquare model model.currentMove
     |> collisionApple
     |> collisionBody
+    |> collisionWalls
     |> scoreForPassedTime time 
     |> Setters.setTime time_
     |> Setters.setLastUpdate time_
@@ -292,9 +307,9 @@ update msg model =
     NextFrame time -> nextFrame time model
     ChangeGridSize gridSize -> 
       case gridSize of 
-      10  -> Model False model.lastUpdate  model.time (initialize 4 (\n -> n+1)) 84 Space gridSize 0 model.wall model.limit |> Update.none
-      20 -> Model False model.lastUpdate model.time (initialize 4 (\n -> n+1)) 152 Space gridSize 0 model.wall model.limit |> Update.none 
-      40 -> Model False model.lastUpdate model.time (initialize 4 (\n -> n+1)) 150 Space gridSize 0 model.wall model.limit |> Update.none 
+      10  -> Model False model.lastUpdate  model.time (initialize 4 (\n -> n+1)) 84 Space gridSize 0 model.wall model.walls model.limit |> Update.none
+      20 -> Model False model.lastUpdate model.time (initialize 4 (\n -> n+1)) 152 Space gridSize 0 model.wall model.walls model.limit |> Update.none 
+      40 -> Model False model.lastUpdate model.time (initialize 4 (\n -> n+1)) 150 Space gridSize 0 model.wall model.walls model.limit |> Update.none 
       _-> model |> Update.none
     NewAppleRandomPosition pos ->
       if (isCollisionApple model) then
@@ -310,13 +325,11 @@ update msg model =
 
 isSnakeCell : List Int -> Int -> Bool
 isSnakeCell snake index = 
-  case snake of 
-    [] -> False
-    head::rest ->
-      if (head == index) then
-        True
-      else 
-        isSnakeCell rest index
+  List.member index snake
+
+isWallCell : List Int -> Int -> Bool
+isWallCell walls index = 
+  List.member index walls
 
 
 {-| Manage all your view functions here. -}
@@ -330,7 +343,10 @@ cell index ({ snake , apple } as model) =
                   if isSnakeCell (Array.toList snake) index then
                     "cell active"
                   else 
-                    "cell"
+                    if isWallCell (Array.toList model.walls) index then
+                      "cell wall"
+                    else
+                      "cell"
     
   in
 
